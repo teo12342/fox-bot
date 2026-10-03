@@ -1,0 +1,28 @@
+name: Website verification and deploy
+on:
+  push:
+    branches: [main]
+    paths: ['apps/web/**', 'package-lock.json', '.github/workflows/website.yml']
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '24', cache: npm}
+      - run: npm ci
+      - run: npm test -w @foxbot/web
+      - run: npm run build -w @foxbot/web
+        env: {NEXT_TELEMETRY_DISABLED: '1'}
+      - name: Deploy static Next.js output
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          test -n "$VERCEL_TOKEN" && test -n "$VERCEL_ORG_ID" && test -n "$VERCEL_PROJECT_ID"
+          mkdir -p apps/web/out/.vercel
+          node -e "require('fs').writeFileSync('apps/web/out/.vercel/project.json',JSON.stringify({orgId:process.env.VERCEL_ORG_ID,projectId:process.env.VERCEL_PROJECT_ID}))"
+          npx vercel@58.4.4 deploy apps/web/out --prod --yes --token "$VERCEL_TOKEN"

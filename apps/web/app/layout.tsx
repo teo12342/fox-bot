@@ -1,0 +1,5 @@
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import './style.css';
+export const metadata: Metadata = { title: { default: 'Fox Bot — Your AI, on your computer', template: '%s · Fox Bot' }, description: 'Local AI teammates for Windows and Linux, with an Android companion. Open source, your providers, your workspace.' };
+export default function Layout({children}:{children:React.ReactNode}) { return <html lang="en"><body><header className="header"><Link className="brand" href="/" aria-label="Fox Bot home"><span className="fox">◈</span> fox bot</Link><nav><Link href="/download">Downloads</Link><Link href="/docs">Documentation</Link><Link href="/source">Open source ↗</Link></nav><Link className="button small" href="/download">Get Fox Bot <span>↗</span></Link></header>{children}<footer><Link className="brand" href="/">◈ fox bot</Link><p>Your computer. Your providers. Your control.</p><div><Link href="/compatibility">Compatibility</Link><Link href="/changelog">Release notes</Link><Link href="/license">License</Link></div><small>Independent open-source project. No affiliation with xAI or OpenAI.</small></footer></body></html> }

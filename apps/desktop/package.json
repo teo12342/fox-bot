@@ -1,0 +1,90 @@
+{
+ "name": "@foxbot/desktop",
+ "version": "0.1.0",
+ "private": true,
+ "main": "dist/main.cjs",
+ "description": "Fox Bot local desktop host",
+ "author": "Fox Bot contributors",
+ "license": "MIT",
+ "scripts": {
+  "dev": "node scripts/dev.mjs",
+  "build": "node scripts/build.mjs",
+  "package:win": "npm run build && electron-builder --win nsis --x64 --arm64",
+  "package:linux": "npm run build && electron-builder --linux AppImage deb rpm tar.gz --x64 --arm64"
+ },
+ "dependencies": {
+  "@foxbot/protocol": "0.1.0",
+  "@modelcontextprotocol/sdk": "^1.32.0",
+  "better-sqlite3": "^13.0.3",
+  "cron-parser": "^5.4.0",
+  "electron-updater": "^6.7.3",
+  "jose": "^6.1.0",
+  "katex": "^0.16.25",
+  "lucide-react": "^0.468.0",
+  "playwright": "^1.56.1",
+  "qrcode": "^1.5.4",
+  "react": "^19.2.0",
+  "react-dom": "^19.2.0",
+  "react-markdown": "^10.1.0",
+  "rehype-katex": "^7.0.1",
+  "remark-gfm": "^4.0.1",
+  "remark-math": "^6.0.0",
+  "ws": "^8.18.3",
+  "zod": "^4.1.12"
+ },
+ "devDependencies": {
+  "@types/better-sqlite3": "^7.6.13",
+  "@types/qrcode": "^1.5.6",
+  "@types/react": "^19.2.0",
+  "@types/react-dom": "^19.2.0",
+  "@types/ws": "^8.18.1",
+  "@vitejs/plugin-react": "^5.1.0",
+  "electron": "44.5.1",
+  "electron-builder": "26.15.3",
+  "esbuild": "^0.25.12",
+  "vite": "^8.3.2"
+ },
+ "build": {
+  "appId": "org.foxbot.desktop",
+  "productName": "Fox Bot",
+  "directories": {
+   "output": "../../release/desktop"
+  },
+  "files": [
+   "dist/**",
+   "package.json"
+  ],
+  "asarUnpack": [
+   "node_modules/better-sqlite3/**"
+  ],
+  "artifactName": "fox-bot-${version}-${os}-${arch}.${ext}",
+  "win": {
+   "target": "nsis"
+  },
+  "nsis": {
+   "oneClick": false,
+   "allowToChangeInstallationDirectory": true,
+   "perMachine": false
+  },
+  "linux": {
+   "category": "Utility",
+   "target": [
+    "AppImage",
+    "deb",
+    "rpm",
+    "tar.gz"
+   ],
+   "maintainer": "Fox Bot contributors"
+  },
+  "extraResources": [
+   {
+    "from": "../../native/target/release",
+    "to": "native",
+    "filter": [
+     "foxbot-native",
+     "foxbot-native.exe"
+    ]
+   }
+  ]
+ }
+}

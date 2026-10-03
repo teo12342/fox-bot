@@ -1,0 +1,7 @@
+.next/
+out/
+.vercel/
+.env*
+*.tsbuildinfo
+*-desktop.png
+*-mobile.png

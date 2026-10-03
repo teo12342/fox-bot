@@ -1,0 +1,37 @@
+name: Publish verified artifacts
+on:
+  workflow_dispatch:
+    inputs:
+      desktop_run: {description: 'Successful Desktop release builds run ID', required: true}
+      android_run: {description: 'Successful Signed Android release run ID', required: true}
+      tag: {description: 'Existing version tag e.g. v0.1.0', required: true}
+      stable: {description: 'Require all production acceptance evidence', type: boolean, default: false}
+permissions: {contents: write, actions: read}
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: '${{ inputs.tag }}'}
+      - uses: actions/setup-node@v4
+        with: {node-version: '24'}
+      - uses: actions/download-artifact@v4
+        with: {run-id: '${{ inputs.desktop_run }}', github-token: '${{ github.token }}', path: release, merge-multiple: true}
+      - uses: actions/download-artifact@v4
+        with: {run-id: '${{ inputs.android_run }}', github-token: '${{ github.token }}', path: release, merge-multiple: true}
+      - name: Metadata, checksums and production gates
+        env:
+          FOX_TAG: ${{ inputs.tag }}
+          FOX_STABLE: ${{ inputs.stable }}
+          FOX_RELEASE_PRIVATE_KEY: ${{ secrets.RELEASE_METADATA_PRIVATE_KEY }}
+        run: |
+          export FOX_VERSION=$(node -p "require('./package.json').version")
+          node .github/scripts/release-manifest.mjs release
+      - name: Publish draft for final review
+        env: {GH_TOKEN: '${{ github.token }}'}
+        run: |
+          FLAGS="--draft"
+          if [ '${{ inputs.stable }}' != true ]; then FLAGS="$FLAGS --prerelease"; fi
+          mapfile -t FILES < <(find release -maxdepth 1 -type f)
+          gh release create '${{ inputs.tag }}' "${FILES[@]}" $FLAGS --verify-tag --title 'Fox Bot ${{ inputs.tag }}' --notes-file docs/RELEASE_NOTES.md
