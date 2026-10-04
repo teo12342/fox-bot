@@ -4,13 +4,13 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import {fileURLToPath} from 'node:url';
-if(process.argv.includes('--help')){console.log('Usage: node scripts/smoke.mjs [--packaged]');process.exit(0);}
-if(process.argv.slice(2).some(flag=>flag!=='--packaged'))throw Error('Unknown smoke option');
+if(process.argv.includes('--help')){console.log('Usage: node scripts/smoke.mjs [--packaged | --installed]');process.exit(0);}
+if(process.argv.slice(2).some(flag=>!['--packaged','--installed'].includes(flag)))throw Error('Unknown smoke option');
 const desktop=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),workspace=path.resolve(desktop,'../..');
 const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
-const packaged=process.argv.includes('--packaged');
+const installed=process.argv.includes('--installed'),packaged=process.argv.includes('--packaged')||installed;
 const profile=path.join(workspace,'test-results','smoke-profile-'+Date.now());
-const app=await electron.launch({...(packaged?{executablePath:path.join(workspace,'release/desktop/win-unpacked/Fox Bot.exe')} : {}),args:[...(packaged?[]:[desktop]),'--user-data-dir='+profile],env,timeout:30000});
+const app=await electron.launch({...(packaged?{executablePath:path.join(workspace,installed?'test-results/install-preview/Fox Bot.exe':'release/desktop/win-unpacked/Fox Bot.exe')} : {}),args:[...(packaged?[]:[desktop]),'--user-data-dir='+profile],env,timeout:30000});
 app.process().stderr?.on('data',b=>process.stderr.write(b));
 try{
  await app.firstWindow();let page;for(let i=0;i<100&&!page;i++){page=app.windows().find(w=>w.url().includes('index.html')&&!w.url().endsWith('#remote'));if(!page)await new Promise(r=>setTimeout(r,100));}if(!page)throw Error('Visible desktop page did not load: '+app.windows().map(w=>w.url()).join(', '));page.on('console',msg=>console.log('renderer:',msg.type(),msg.text()));page.on('pageerror',err=>console.error('renderer error:',err.message));console.log('Testing desktop page:',page.url());await page.waitForSelector('.welcome',{timeout:15000});

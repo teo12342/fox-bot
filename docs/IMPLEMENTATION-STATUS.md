@@ -13,13 +13,14 @@ This file records progress against the full original objective. It is not a comp
 - Android debug APK assembled; six JVM tests pass, lint has zero errors. No device is attached for Android-to-desktop end-to-end verification. Production signing is not supplied.
 - Website https://fox-bot-pi.vercel.app/ deployed and verified, with unavailable production download buttons disabled.
 - Public source repository https://github.com/teo12342/fox-bot is published.
-- Windows x64 unsigned development installer built (361 MB with browser runtime). Actual packaged-app smoke verifies local IPC/SQLite, bundled native helper, Chromium navigation, content inspection and screenshot artifact. Graceful worker/browser shutdown passes. This is not a signed or clean-install certification.
+- Windows x64 unsigned development installer built with browser runtime. Actual packaged and isolated installed-app smoke verify local IPC/SQLite, bundled native helper, Chromium navigation, PDF extraction, memory controls, inactive voice controls, connector setup and screenshot artifacts. Silent NSIS install and uninstall pass. This is not signed or clean-PC certification.
 - HostRelay/service pairing integration verifies pinned signatures, manual codes, replay rejection, early ICE, session retirement, and revocation. Real Chromium peers establish connected DTLS and transfer 200 KB of fragmented data. This does not substitute for physical Android/cross-network acceptance.
 - Native agent integration has eleven simulated helper/real-provider-fixture tests for tool schemas, approvals, run ownership, takeover, emergency stop/resume and deduplicated physical input. Six Rust tests include real read-only focus and PNG screenshot checks. No actual desktop input is driven by these tests.
 - Speech adapter has seventeen local-fixture tests for transcription, streamed synthesis, endpoint and format validation, cancellation, response limits and credential isolation. Live voice is not certified.
 - Voice memo recording, reviewed transcripts, configured-provider synthesis and playback are integrated in desktop UI. A physical microphone and live paid-provider acceptance are still unverified.
 - Text, images, PDF, DOCX, XLSX and PPTX extract locally with bounded content, cancellation and isolated PDF processes. Packaged PDF-to-model-fixture smoke passes; thirteen extraction/engine tests cover actual model payloads, vision gating, metadata removal and malicious inputs. Audio attachments, OCR and legacy binary Office files are not supported by this extractor.
 - Integrated verification: 91 core tests, 3 signaling tests and 2 website tests pass; TypeScript checks pass. These counts describe local verification, not certification of every requested platform.
+- GitHub Linux core verification, Windows desktop smoke and website verification pass. Windows x64 packaging and packaged smoke pass. Windows ARM64 packaging found an unsupported transitive Canvas native binding; dependency correction and retesting are required before claiming support.
 
 ## Work remaining before completion
 
