@@ -16,6 +16,8 @@ jobs:
           - {os: ubuntu-latest, arch: x64, platform: linux}
           - {os: ubuntu-24.04-arm, arch: arm64, platform: linux}
     runs-on: ${{ matrix.os }}
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/vendor/browsers
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,14 +26,12 @@ jobs:
       - run: npm ci
       - name: Native helper
         run: cargo build --release --manifest-path native/Cargo.toml
+      - name: Install browser transport test and bundled runtime
+        run: npx playwright install --with-deps chromium
       - name: Tests
         run: npm test
       - name: Protocol and desktop
         run: npm run build
-      - name: Bundle Chromium and media runtime for this architecture
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/vendor/browsers
-        run: npx playwright install chromium
       - name: Package Windows
         if: matrix.platform == 'win'
         working-directory: apps/desktop
@@ -55,6 +55,7 @@ jobs:
         working-directory: apps/desktop
         run: npx electron-builder --linux flatpak --${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
           path: |

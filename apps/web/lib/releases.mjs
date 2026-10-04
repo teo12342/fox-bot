@@ -2,6 +2,7 @@ export function validateManifest(input) {
   if (!input || input.schemaVersion !== 1 || typeof input.version !== 'string' || !Array.isArray(input.artifacts) || !Array.isArray(input.gates)) throw new Error('Unsupported release manifest');
   for (const a of input.artifacts) {
     if (!['windows','linux','android'].includes(a.platform) || !['x64','arm64','universal'].includes(a.arch) || typeof a.format !== 'string' || !/^https:\/\/github\.com\/[^/]+\/[^/]+\/releases\/download\//.test(a.url) || !/^[a-f0-9]{64}$/.test(a.sha256) || !Number.isSafeInteger(a.size) || a.size <= 0) throw new Error('Invalid release artifact');
+    if (a.warning !== undefined && (typeof a.warning !== 'string' || a.warning.length > 1000)) throw new Error('Invalid artifact warning');
   }
   return input;
 }
