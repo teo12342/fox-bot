@@ -28,6 +28,10 @@ jobs:
         run: npm test
       - name: Protocol and desktop
         run: npm run build
+      - name: Bundle Chromium and media runtime for this architecture
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/vendor/browsers
+        run: npx playwright install chromium
       - name: Package Windows
         if: matrix.platform == 'win'
         working-directory: apps/desktop
@@ -39,6 +43,10 @@ jobs:
         if: matrix.platform == 'linux'
         working-directory: apps/desktop
         run: npx electron-builder --linux AppImage deb rpm tar.gz --${{ matrix.arch }}
+      - name: Verify the packaged Windows browser and native helper
+        if: matrix.platform == 'win'
+        working-directory: apps/desktop
+        run: node scripts/smoke.mjs --packaged
       - name: Flatpak dependencies
         if: matrix.platform == 'linux'
         run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder elfutils

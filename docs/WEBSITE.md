@@ -4,7 +4,7 @@ Production website: https://fox-bot-pi.vercel.app/
 
 Vercel project: fox-bot. Deployment owner scope: teolabrop1-2608s-projects. Static Next.js export is built from apps/web. Trailing slash routes are required for folder-index hosting. All public pages and releases.json were verified with HTTP 200 on 2026-10-04.
 
-The manifest currently contains no published installer artifacts. The download page displays disabled controls rather than invented links. Public source publication is pending. All production acceptance gates remain pending.
+The manifest currently contains no published installer artifacts. The download page displays disabled controls rather than invented links. Public source is available at https://github.com/teo12342/fox-bot. All production acceptance gates remain pending.
 
 Build with npm run build -w @foxbot/web. Link the generated output explicitly to fox-bot before each manual deployment because the build recreates out:
 

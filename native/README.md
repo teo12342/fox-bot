@@ -10,7 +10,7 @@ Requests and replies are newline-delimited compact JSON. Request: `{id,method,ar
 |---|---|---|
 | capabilities | `{}` | Availability booleans, platform and limitations |
 | inspect | `{}` | Up to 500 elements, depth 8, names/roles/bounds through Windows UIAutomation or Linux AT-SPI |
-| screenshot | `{path:"absolute filesystem path"}` | Windows: BMP path/mime, virtual-desktop origin and size. Linux: ImageMagick writes according to extension |
+| screenshot | `{path:"absolute filesystem path"}` | PNG path/mime, virtual-desktop origin and size on Windows. Linux: ImageMagick writes according to extension; runtime requests PNG |
 | click | `{x:integer,y:integer}` | Left click at absolute desktop coordinates |
 | type | `{text:string}` | Unicode text, up to 32 KiB |
 | key | `{key:string}` | enter/tab/escape/backspace/delete/arrows/space/home/end/pageup/pagedown |
@@ -18,8 +18,10 @@ Requests and replies are newline-delimited compact JSON. Request: `{id,method,ar
 | emergency_stop | `{}` | Latches stopped; blocks all input methods |
 | resume | `{}` | Explicitly clears stopped state |
 
-Windows screenshot captures all monitors using GDI and requires a writable caller-supplied absolute path. Secure/elevated desktops may reject SendInput; errors are returned. Accessibility names can contain private application data and must remain local unless the owner deliberately requests remote viewing. Password fields are not read as values.
+Windows screenshot captures all monitors using GDI and encodes an RGBA PNG with the maintained `png` crate. It requires a writable caller-supplied absolute path. Secure/elevated desktops may reject SendInput; errors are returned. Accessibility names can contain private application data and must remain local unless the owner deliberately requests remote viewing. Password fields are not read as values.
+
+Before `type`, Windows queries the focused UIAutomation element and refuses `IsPassword` fields, authentication-related names/IDs, or unreadable accessibility metadata. Linux queries the focused AT-SPI element and refuses password-text roles, authentication labels, or unavailable focus information. Owners must type credentials directly during takeover; no programmatic bypass flag exists. MFA detection uses label heuristics (OTP, MFA, verification/security code, authenticator, passcode) and cannot identify every application's unlabeled authentication screen. Focus can change between inspection and OS input; this guard reduces risk but does not eliminate that race. Native keys do not accept printable characters or modifier combinations. Tests validate classification without sending input into applications.
 
 **Remaining native launch gates:** Wayland ScreenCast/RemoteDesktop portal sessions are not implemented; capabilities return native input/capture unavailable. Linux backends, Windows ARM64, and display-scale/monitor edge cases require platform testing. Do not advertise full certified Linux control until these gates pass.
 
-Run `cargo test` for argument validation and stop-latch behavior. Safe Windows smoke checks can submit capabilities, inspect, and screenshot; automated tests must not type or click into the user's active applications. The helper is synchronous: emergency stop prevents subsequent requests but cannot interrupt a tool call already blocked inside an OS API. The supervising desktop should terminate the helper if an OS call exceeds its deadline.
+Run `cargo test` for argument validation, stop-latch behavior, and read-only focus/screenshot probes. The Windows screenshot test writes a unique temporary file, checks PNG decoding and dimensions, and removes the file immediately without displaying it. Safe Windows smoke checks can submit capabilities, inspect, and screenshot; automated tests must not type or click into the user's active applications. The helper is synchronous: emergency stop prevents subsequent requests but cannot interrupt a tool call already blocked inside an OS API. The supervising desktop should terminate the helper if an OS call exceeds its deadline.

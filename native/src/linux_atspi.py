@@ -1,8 +1,10 @@
 """Read-only AT-SPI inspection; embedded into the native binary."""
 import json
+import sys
 import pyatspi
 
 nodes = []
+focused = {"found": False}
 
 def walk(element, depth):
     if depth > 8 or len(nodes) >= 500:
@@ -11,6 +13,9 @@ def walk(element, depth):
         state = element.getState()
         if state.contains(pyatspi.STATE_DEFUNCT):
             return
+        if state.contains(pyatspi.STATE_FOCUSED):
+            focused.update({"found": True, "name": element.name or "",
+                            "password": element.getRole() == pyatspi.ROLE_PASSWORD_TEXT})
         try:
             rect = element.queryComponent().getExtents(pyatspi.DESKTOP_COORDS)
             bounds = {"x": rect.x, "y": rect.y, "width": rect.width, "height": rect.height}
@@ -31,4 +36,5 @@ def walk(element, depth):
 
 desktop = pyatspi.Registry.getDesktop(0)
 walk(desktop, 0)
-print(json.dumps({"elements": nodes, "limit": 500}, separators=(",", ":")))
+print(json.dumps(focused if "--focused-sensitive" in sys.argv else
+                 {"elements": nodes, "limit": 500}, separators=(",", ":")))

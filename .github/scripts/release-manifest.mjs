@@ -20,7 +20,7 @@ const evidence=JSON.parse(await readFile('docs/release-evidence.json','utf8'));
 const stable=process.env.FOX_STABLE==='true';
 if(stable && evidence.gates.some(g=>!g.passed||!g.evidence))throw new Error('Production release blocked: missing acceptance evidence');
 if(stable){for(const arch of ['x64','arm64']){if(!artifacts.some(a=>a.platform==='windows'&&a.arch===arch&&a.format==='exe'))throw new Error(`Missing Windows ${arch}`);for(const format of ['AppImage','deb','rpm','flatpak','tar.gz'])if(!artifacts.some(a=>a.platform==='linux'&&a.arch===arch&&a.format===format))throw new Error(`Missing Linux ${arch} ${format}`)}if(!artifacts.some(a=>a.platform==='android'&&a.arch==='universal'&&a.format==='apk'))throw new Error('Missing Android APK')}
-const manifest={schemaVersion:1,version,channel:stable?'stable':'preview',publishedAt:new Date().toISOString(),sourceUrl:`https://github.com/${repository}`,artifacts,gates:evidence.gates};
+const manifest={schemaVersion:1,version,channel:stable?'stable':'preview',publishedAt:new Date().toISOString(),sourceUrl:`https://github.com/${repository}`,repositoryUrl:`https://github.com/${repository}`,artifacts,gates:evidence.gates};
 const serialized=JSON.stringify(manifest,null,2)+'\n';
 await writeFile(path.join(dir,'releases.json'),serialized);await writeFile(path.join(dir,'SHA256SUMS'),checksums.join('\n')+'\n');
 if(process.env.FOX_RELEASE_PRIVATE_KEY){const signature=sign(null,Buffer.from(serialized),process.env.FOX_RELEASE_PRIVATE_KEY).toString('base64');await writeFile(path.join(dir,'releases.json.sig'),signature+'\n')}else if(stable)throw new Error('Stable release requires an Ed25519 metadata signing key');

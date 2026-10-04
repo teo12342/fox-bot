@@ -15,12 +15,14 @@
  "dependencies": {
   "@foxbot/protocol": "0.1.0",
   "@modelcontextprotocol/sdk": "^1.32.0",
+  "@xmldom/xmldom": "^0.9.12",
   "better-sqlite3": "^13.0.3",
   "cron-parser": "^5.4.0",
   "electron-updater": "^6.7.3",
   "jose": "^6.1.0",
   "katex": "^0.16.25",
   "lucide-react": "^0.468.0",
+  "pdf-parse": "^2.4.5",
   "playwright": "^1.56.1",
   "qrcode": "^1.5.4",
   "react": "^19.2.0",
@@ -30,6 +32,7 @@
   "remark-gfm": "^4.0.1",
   "remark-math": "^6.0.0",
   "ws": "^8.18.3",
+  "yauzl": "^3.4.0",
   "zod": "^4.1.12"
  },
  "devDependencies": {
@@ -38,6 +41,7 @@
   "@types/react": "^19.2.0",
   "@types/react-dom": "^19.2.0",
   "@types/ws": "^8.18.1",
+  "@types/yauzl": "^3.4.0",
   "@vitejs/plugin-react": "^5.1.0",
   "electron": "44.5.1",
   "electron-builder": "26.15.3",
@@ -84,6 +88,10 @@
      "foxbot-native",
      "foxbot-native.exe"
     ]
+   },
+   {
+    "from": "../../vendor/browsers",
+    "to": "browsers"
    }
   ]
  }

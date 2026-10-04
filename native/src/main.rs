@@ -7,6 +7,7 @@ static STOPPED: AtomicBool = AtomicBool::new(false);
 struct Request { id: Value, method: String, #[serde(default)] args: Value }
 fn number(a:&Value,k:&str)->Result<i32,String>{a[k].as_i64().and_then(|v|i32::try_from(v).ok()).ok_or(format!("Invalid {k}"))}
 fn text<'a>(a:&'a Value,k:&str)->Result<&'a str,String>{a[k].as_str().ok_or(format!("Invalid {k}"))}
+fn sensitive_label(label:&str)->bool{let label=label.to_lowercase();["password","passphrase","passcode","one-time","one time","verification code","security code","authenticator","2fa","mfa","otp"].iter().any(|v|label.contains(v))}
 fn dispatch(method:&str,args:&Value)->Result<Value,String>{
  if method=="emergency_stop" {STOPPED.store(true,Ordering::SeqCst);return Ok(json!({"stopped":true}));}
  if method=="resume" {STOPPED.store(false,Ordering::SeqCst);return Ok(json!({"stopped":false}));}
@@ -32,13 +33,21 @@ mod platform {
  pub fn dispatch(method:&str,args:&Value)->Result<Value,String>{unsafe{match method {
   "capabilities"=>Ok(json!({"platform":"windows","inspect":true,"click":true,"type":true,"key":true,"scroll":true,"screenshot":true,"stopped":STOPPED.load(Ordering::SeqCst),"limitations":["No elevated applications, lock screen, or secure desktop"]})),
   "click"=>{let x=number(args,"x")?;let y=number(args,"y")?;SetCursorPos(x,y).map_err(error)?;inputs(&[mouse(MOUSEEVENTF_LEFTDOWN,0),mouse(MOUSEEVENTF_LEFTUP,0)])},
-  "type"=>{let s=text(args,"text")?;if s.len()>32768{return Err("Text too long".into());}let events:Vec<INPUT>=s.encode_utf16().flat_map(|c|[keyboard(VIRTUAL_KEY(0),c,KEYEVENTF_UNICODE),keyboard(VIRTUAL_KEY(0),c,KEYEVENTF_UNICODE|KEYEVENTF_KEYUP)]).collect();inputs(&events)},
+  "type"=>{let s=text(args,"text")?;if s.len()>32768{return Err("Text too long".into());}guard_focused_input()?;let events:Vec<INPUT>=s.encode_utf16().flat_map(|c|[keyboard(VIRTUAL_KEY(0),c,KEYEVENTF_UNICODE),keyboard(VIRTUAL_KEY(0),c,KEYEVENTF_UNICODE|KEYEVENTF_KEYUP)]).collect();inputs(&events)},
   "key"=>{let vk=match text(args,"key")?.to_lowercase().as_str(){"enter"=>VK_RETURN,"tab"=>VK_TAB,"escape"=>VK_ESCAPE,"backspace"=>VK_BACK,"delete"=>VK_DELETE,"up"=>VK_UP,"down"=>VK_DOWN,"left"=>VK_LEFT,"right"=>VK_RIGHT,"space"=>VK_SPACE,"home"=>VK_HOME,"end"=>VK_END,"pageup"=>VK_PRIOR,"pagedown"=>VK_NEXT,_=>return Err("Unsupported key".into())};inputs(&[keyboard(vk,0,KEYBD_EVENT_FLAGS(0)),keyboard(vk,0,KEYEVENTF_KEYUP)])},
   "scroll"=>{let amount=number(args,"amount")?.clamp(-100,100);inputs(&[mouse(MOUSEEVENTF_WHEEL,(amount*120)as u32)])},
   "inspect"=>inspect(),
   "screenshot"=>screenshot(text(args,"path")?),
   _=>Err("Unsupported method".into())
  }}}
+ pub(super) unsafe fn guard_focused_input()->Result<(),String>{unsafe{
+  let initialized=CoInitializeEx(None,COINIT_MULTITHREADED).is_ok();
+  let result=(||{let automation:IUIAutomation=CoCreateInstance(&CUIAutomation,None,CLSCTX_INPROC_SERVER).map_err(|_|"Cannot verify focused field; owner must type directly during takeover".to_string())?;let focused=automation.GetFocusedElement().map_err(|_|"Cannot verify focused field; owner must type directly during takeover".to_string())?;
+   let password=focused.CurrentIsPassword().map_err(|_|"Cannot verify password protection; owner must type directly during takeover".to_string())?.as_bool();
+   let name=focused.CurrentName().map_err(|_|"Cannot inspect focused field; owner must type directly during takeover".to_string())?.to_string();let id=focused.CurrentAutomationId().map_err(|_|"Cannot inspect focused field; owner must type directly during takeover".to_string())?.to_string();
+   if password||sensitive_label(&name)||sensitive_label(&id){return Err("Password or authentication field: owner must type directly during human takeover".into());}Ok(())})();
+  if initialized{CoUninitialize();}result
+ }}
  unsafe fn inspect()->Result<Value,String>{unsafe{
   let initialized=CoInitializeEx(None,COINIT_MULTITHREADED).is_ok();
   let result=(||{let automation:IUIAutomation=CoCreateInstance(&CUIAutomation,None,CLSCTX_INPROC_SERVER).map_err(error)?;let root=automation.GetRootElement().map_err(error)?;let walker=automation.ControlViewWalker().map_err(error)?;let mut nodes=Vec::new();walk(&walker,&root,0,&mut nodes);Ok(json!({"elements":nodes,"limit":500}))})();
@@ -57,7 +66,8 @@ mod platform {
   let old=SelectObject(dc,bitmap.into());let copied=BitBlt(dc,0,0,w,h,Some(screen),x,y,SRCCOPY|CAPTUREBLT);SelectObject(dc,old);
   let mut info=BITMAPINFO::default();info.bmiHeader.biSize=std::mem::size_of::<BITMAPINFOHEADER>()as u32;info.bmiHeader.biWidth=w;info.bmiHeader.biHeight=-h;info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB.0;
   let mut pixels=vec![0u8;(w as usize)*(h as usize)*4];let rows=GetDIBits(dc,bitmap,0,h as u32,Some(pixels.as_mut_ptr().cast()),&mut info,DIB_RGB_COLORS);let _=DeleteObject(bitmap.into());let _=DeleteDC(dc);ReleaseDC(None,screen);copied.map_err(error)?;if rows!=h{return Err("GetDIBits failed".into());}
-  let mut bytes=Vec::with_capacity(54+pixels.len());bytes.extend(b"BM");bytes.extend(((54+pixels.len())as u32).to_le_bytes());bytes.extend([0u8;4]);bytes.extend(54u32.to_le_bytes());bytes.extend(40u32.to_le_bytes());bytes.extend(w.to_le_bytes());bytes.extend((-h).to_le_bytes());bytes.extend(1u16.to_le_bytes());bytes.extend(32u16.to_le_bytes());bytes.extend([0u8;24]);bytes.extend(pixels);std::fs::write(path,bytes).map_err(|e|e.to_string())?;Ok(json!({"path":path,"mime":"image/bmp","x":x,"y":y,"width":w,"height":h}))
+  for pixel in pixels.chunks_exact_mut(4){pixel.swap(0,2);pixel[3]=255;}
+  let file=std::fs::File::create(path).map_err(|e|e.to_string())?;let mut encoder=png::Encoder::new(std::io::BufWriter::new(file),w as u32,h as u32);encoder.set_color(png::ColorType::Rgba);encoder.set_depth(png::BitDepth::Eight);let mut writer=encoder.write_header().map_err(|e|e.to_string())?;writer.write_image_data(&pixels).map_err(|e|e.to_string())?;writer.finish().map_err(|e|e.to_string())?;Ok(json!({"path":path,"mime":"image/png","x":x,"y":y,"width":w,"height":h}))
  }}
 }
 
@@ -72,7 +82,7 @@ mod platform {
   if matches!(method,"click"|"type"|"key"|"scroll")&&!input{return Err("Native input unavailable: requires an X11 session and xdotool; Wayland control not implemented".into());}
   match method{
    "click"=>{let x=number(args,"x")?.to_string();let y=number(args,"y")?.to_string();run("xdotool",&["mousemove","--sync",&x,&y,"click","1"])?;Ok(json!({"sent":true}))},
-   "type"=>{let s=text(args,"text")?;if s.len()>32768{return Err("Text too long".into());}run("xdotool",&["type","--clearmodifiers","--",s])?;Ok(json!({"sent":true}))},
+   "type"=>{let s=text(args,"text")?;if s.len()>32768{return Err("Text too long".into());}let focused=run("python3",&["-c",include_str!("linux_atspi.py"),"--focused-sensitive"])?;let focused:Value=serde_json::from_str(&focused).map_err(|_|"Cannot verify focused field; owner must type directly during takeover".to_string())?;if focused["found"].as_bool()!=Some(true){return Err("Cannot verify focused field; owner must type directly during takeover".into());}if focused["password"].as_bool()!=Some(false)||sensitive_label(focused["name"].as_str().unwrap_or("")){return Err("Password or authentication field: owner must type directly during human takeover".into());}run("xdotool",&["type","--clearmodifiers","--",s])?;Ok(json!({"sent":true}))},
    "key"=>{let key=match text(args,"key")?.to_lowercase().as_str(){"enter"=>"Return","tab"=>"Tab","escape"=>"Escape","backspace"=>"BackSpace","delete"=>"Delete","up"=>"Up","down"=>"Down","left"=>"Left","right"=>"Right","space"=>"space","home"=>"Home","end"=>"End","pageup"=>"Prior","pagedown"=>"Next",_=>return Err("Unsupported key".into())};run("xdotool",&["key","--clearmodifiers",key])?;Ok(json!({"sent":true}))},
    "scroll"=>{let amount=number(args,"amount")?.clamp(-100,100);if amount!=0{let n=amount.abs().to_string();run("xdotool",&["click","--repeat",&n,"--delay","15",if amount>0{"4"}else{"5"}])?;}Ok(json!({"sent":true}))},
    "screenshot"=>{let path=text(args,"path")?;if !std::path::Path::new(path).is_absolute(){return Err("Screenshot path must be absolute".into());}if !x11{return Err("Wayland screenshot portal not implemented".into());}run("import",&["-window","root",path])?;Ok(json!({"path":path}))},
@@ -84,4 +94,9 @@ mod platform {
 #[cfg(not(any(windows,target_os="linux")))]
 mod platform{use super::*;pub fn dispatch(_: &str,_:&Value)->Result<Value,String>{Err("Unsupported platform".into())}}
 #[cfg(test)]
-mod tests{use super::*;#[test]fn bounds(){assert!(number(&json!({"x":i64::MAX}),"x").is_err());assert!(text(&json!({"text":1}),"text").is_err());}#[test]fn emergency_stop_blocks_input(){dispatch("emergency_stop",&json!({})).unwrap();assert!(dispatch("click",&json!({"x":0,"y":0})).is_err());dispatch("resume",&json!({})).unwrap();}#[test]fn unknown_method(){assert!(dispatch("unknown",&json!({})).is_err());}}
+mod tests{use super::*;#[test]fn bounds(){assert!(number(&json!({"x":i64::MAX}),"x").is_err());assert!(text(&json!({"text":1}),"text").is_err());}#[test]fn emergency_stop_blocks_input(){dispatch("emergency_stop",&json!({})).unwrap();assert!(dispatch("click",&json!({"x":0,"y":0})).is_err());dispatch("resume",&json!({})).unwrap();}#[test]fn unknown_method(){assert!(dispatch("unknown",&json!({})).is_err());}#[test]fn sensitive_authentication_labels(){for s in ["Password","Enter verification code","OTPInput","MFA token","Authenticator code","one-time passcode"]{assert!(sensitive_label(s));}for s in ["Search","Document editor","Message","Source code editor"]{assert!(!sensitive_label(s));}}}
+#[cfg(all(test,windows))]
+mod readonly_windows_tests{
+ #[test]fn focused_uia_probe_never_sends_input(){if let Err(message)=unsafe{super::platform::guard_focused_input()}{assert!(message.contains("takeover"));}}
+ #[test]fn screenshot_encodes_png_in_a_temporary_file(){let name=format!("fox-native-test-{}-{}.png",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());let path=std::env::temp_dir().join(name);let result=super::platform::dispatch("screenshot",&serde_json::json!({"path":path.to_str().unwrap()}));let bytes=std::fs::read(&path);let _=std::fs::remove_file(&path);let result=result.unwrap();let bytes=bytes.unwrap();assert_eq!(&bytes[..8],b"\x89PNG\r\n\x1a\n");assert_eq!(result["mime"],"image/png");let decoder=png::Decoder::new(std::io::Cursor::new(bytes));let mut reader=decoder.read_info().unwrap();assert_eq!(reader.info().width as u64,result["width"].as_u64().unwrap());assert_eq!(reader.info().height as u64,result["height"].as_u64().unwrap());let mut decoded=vec![0u8;reader.output_buffer_size().unwrap()];let frame=reader.next_frame(&mut decoded).unwrap();assert_eq!(frame.color_type,png::ColorType::Rgba);assert!(decoded[..frame.buffer_size()].chunks_exact(4).all(|pixel|pixel[3]==255));}
+}

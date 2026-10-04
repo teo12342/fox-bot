@@ -1,0 +1,43 @@
+name: Verify source and desktop
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '24', cache: npm}
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Browser transport test runtime
+        run: npx playwright install --with-deps chromium
+      - run: npm test
+      - run: npm test -w @foxbot/web
+      - run: npm test -w @foxbot/signaling
+      - run: npm run build
+      - run: npm run build -w @foxbot/web
+        env: {NEXT_TELEMETRY_DISABLED: '1'}
+  desktop-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '24', cache: npm}
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm ci
+      - run: cargo build --release --manifest-path native/Cargo.toml
+      - run: npm run build
+      - name: Rebuild SQLite for Electron ABI
+        working-directory: apps/desktop
+        run: npx electron-builder install-app-deps --arch x64
+      - name: Real desktop smoke
+        working-directory: apps/desktop
+        run: node scripts/smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: desktop-smoke, path: 'test-results/desktop-smoke.png', if-no-files-found: warn}
