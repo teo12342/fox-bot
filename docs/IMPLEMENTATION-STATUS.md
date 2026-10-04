@@ -19,8 +19,9 @@ This file records progress against the full original objective. It is not a comp
 - Speech adapter has seventeen local-fixture tests for transcription, streamed synthesis, endpoint and format validation, cancellation, response limits and credential isolation. Live voice is not certified.
 - Voice memo recording, reviewed transcripts, configured-provider synthesis and playback are integrated in desktop UI. A physical microphone and live paid-provider acceptance are still unverified.
 - Text, images, PDF, DOCX, XLSX and PPTX extract locally with bounded content, cancellation and isolated PDF processes. Packaged PDF-to-model-fixture smoke passes; thirteen extraction/engine tests cover actual model payloads, vision gating, metadata removal and malicious inputs. Audio attachments, OCR and legacy binary Office files are not supported by this extractor.
-- Integrated verification: 91 core tests, 3 signaling tests and 2 website tests pass; TypeScript checks pass. These counts describe local verification, not certification of every requested platform.
-- GitHub Linux core verification, Windows desktop smoke and website verification pass. Windows x64 packaging and packaged smoke pass. Windows ARM64 packaging found an unsupported transitive Canvas native binding; dependency correction and retesting are required before claiming support.
+- Integrated verification: 94 core tests, 3 signaling tests and 3 website tests pass; TypeScript checks pass. Terminal cancellation and timeout tests verify that owned descendants stop while a separate sibling process survives. These counts describe local verification, not certification of every requested platform.
+- GitHub Linux core verification, Windows desktop smoke and website verification pass. Windows x64 packaging and packaged smoke pass. Canvas 0.1.100 supplies the previously missing Windows ARM64 binding, and Linux packaging now has an explicit executable name. Fresh architecture builds must validate these corrections before claiming support.
+- Immutable development prerelease v0.1.0-dev.1 is published with an unsigned Windows x64 installer and debug-signed Android APK. Public asset hashes were independently downloaded and checked; the website displays their development status. The prerelease predates the terminal and architecture packaging corrections.
 
 ## Work remaining before completion
 
@@ -32,7 +33,7 @@ This file records progress against the full original objective. It is not a comp
 6. Complete Wayland portals and multi-monitor/scale verification. Native tool integration, desktop ownership, emergency stop/resume and password-field typing refusal are implemented; native MFA detection remains heuristic.
 7. Verify mobile command/fragmentation/signaling interoperability, real media/control/voice, reconnection, revoked peers, offline states, and two-network TURN operation.
 8. Build/install-test all desktop architectures/formats, sign Windows production binaries/APK/update metadata, and certify the Linux matrix. Windows x64 browser bundling is verified; other platform browser resources still need testing.
-9. Publish real prerelease artifacts; update website only with verified artifact links and correct development/stable labels. Public source is published.
-10. Inspect CI results after publication; verify source licenses/notices, updates and final end-to-end acceptance against every original requirement.
+9. Publish subsequent verified development builds and eventual production artifacts; preserve immutable assets and accurate development/stable labels. The initial development downloads and public source are published.
+10. Inspect CI results after publication; resolve browser redistribution evidence and bundled FFmpeg corresponding-source obligations, verify dependency notices, implement signed updates and complete final end-to-end acceptance against every original requirement. A repository license alone does not establish permission to redistribute its downloaded binaries.
 
 The goal remains active. Unavailable external prerequisites do not replace or narrow the requested final state.

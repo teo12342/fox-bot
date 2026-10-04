@@ -1,7 +1,15 @@
 {
-  "name": "fox-bot", "version": "0.1.0", "private": true,
+  "name": "fox-bot",
+  "version": "0.1.0",
+  "private": true,
   "description": "Local AI teammates with a paired Android companion",
-  "license": "MIT", "workspaces": ["apps/desktop", "apps/web", "services/signaling", "packages/protocol"],
+  "license": "MIT",
+  "workspaces": [
+    "apps/desktop",
+    "apps/web",
+    "services/signaling",
+    "packages/protocol"
+  ],
   "scripts": {
     "dev": "npm run dev -w @foxbot/desktop",
     "build": "npm run build -w @foxbot/protocol && npm run build -w @foxbot/desktop",
@@ -10,5 +18,12 @@
     "package:win": "npm run package:win -w @foxbot/desktop",
     "package:linux": "npm run package:linux -w @foxbot/desktop"
   },
-  "devDependencies": {"typescript": "^5.9.3", "tsx": "^4.20.6", "@types/node": "^24.0.0"}
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "@napi-rs/canvas": "0.1.100"
+  }
 }

@@ -1,6 +1,6 @@
 import {mkdir,readFile,writeFile,readdir,realpath} from 'node:fs/promises';
 import {resolve,relative,isAbsolute,dirname,join} from 'node:path';
-import {spawn} from 'node:child_process';
+import {spawn,execFile} from 'node:child_process';
 import type {BrowserContext} from 'playwright';
 import type {ToolDefinition} from './providers';
 import {z} from 'zod';
@@ -32,6 +32,7 @@ export const approvalTools=new Set(['workspace_write','terminal_run','browser_cl
 const nativeSchemas:Record<string,z.ZodType>={native_capabilities:z.object({}).strict(),native_inspect:z.object({}).strict(),native_screenshot:z.object({}).strict(),native_click:z.object({x:z.number().int().min(-100000).max(100000),y:z.number().int().min(-100000).max(100000)}).strict(),native_type:z.object({text:z.string().max(32768)}).strict(),native_key:z.object({key:z.enum(['enter','tab','escape','backspace','delete','up','down','left','right','space','home','end','pageup','pagedown'])}).strict(),native_scroll:z.object({amount:z.number().int().min(-100).max(100)}).strict()};
 export class Tools {
  contexts=new Map<string,BrowserContext>(); takenOver=false;nativeStopped=false;nativeOwner:string|undefined;
+ terminalTimeoutMs=60000;
  constructor(readonly root:string,readonly artifact:(path:string,mime:string,runId?:string)=>Promise<string>,readonly native?:(method:string,args:any)=>Promise<any>){ }
  validate(name:string,args:any){if(nativeSchemas[name])return nativeSchemas[name].parse(args);return args;}
  acquireNative(runId:string){if(this.nativeStopped)throw Error('Native computer emergency stop is active');if(this.takenOver)throw Error('Native computer is under human control');if(!runId)throw Error('Native computer requires a run owner');if(this.nativeOwner&&this.nativeOwner!==runId)throw Error('Native computer is owned by another run');this.nativeOwner=runId;}
@@ -55,7 +56,28 @@ export class Tools {
   if(name==='workspace_list')return JSON.stringify(await readdir(await this.safePath(args.path||'.'),{withFileTypes:true}).then(x=>x.filter(e=>e.name!=='.browser').map(e=>({name:e.name,directory:e.isDirectory()}))));
   if(name==='workspace_read'){const p=await this.safePath(args.path);const b=await readFile(p);if(b.length>1024*1024)throw Error('File exceeds 1 MB text tool limit');return b.toString('utf8');}
   if(name==='workspace_write'){const p=await this.safePath(args.path,true);await mkdir(dirname(p),{recursive:true});await writeFile(p,args.content,'utf8');return 'Saved '+args.path;}
-  if(name==='terminal_run')return new Promise((ok,no)=>{const shell=process.platform==='win32'?'powershell.exe':'/bin/sh';const child=spawn(shell,process.platform==='win32'?['-NoProfile','-NonInteractive','-Command',args.command]:['-c',args.command],{cwd:this.root,windowsHide:true,signal,env:{PATH:process.env.PATH,SystemRoot:process.env.SystemRoot,TEMP:process.env.TEMP,LANG:process.env.LANG}});let output='';const timer=setTimeout(()=>child.kill(),60000);child.stdout.on('data',b=>output=(output+b).slice(-100000));child.stderr.on('data',b=>output=(output+b).slice(-100000));child.on('error',e=>{clearTimeout(timer);no(e);});child.on('exit',code=>{clearTimeout(timer);ok(`Exit ${code}\n${output}`);});});
+  if(name==='terminal_run'){
+   const command=z.string().min(1).max(200000).parse(args.command),systemRoot=process.env.SystemRoot??'C:\\Windows';
+   const windows=process.platform==='win32',shell=windows?join(systemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe'):'/bin/sh';
+   const timeout=Math.min(60000,Math.max(1,this.terminalTimeoutMs));
+   return new Promise((ok,no)=>{
+    // Do not use spawn's signal option: it kills only the shell before taskkill can discover descendants.
+    const shellCommand=windows?`& { ${command}\n } | Out-Default; if ($null -ne $LASTEXITCODE) { exit $LASTEXITCODE }`:command;
+    const child=spawn(shell,windows?['-NoProfile','-NonInteractive','-Command',shellCommand]:['-c',command],{cwd:this.root,windowsHide:true,detached:!windows,env:{PATH:process.env.PATH,SystemRoot:process.env.SystemRoot,TEMP:process.env.TEMP,LANG:process.env.LANG,...(windows?{PATHEXT:'.COM;.EXE;.BAT;.CMD',ComSpec:join(systemRoot,'System32','cmd.exe')}:{})}});
+    let output='',reason:'abort'|'timeout'|undefined,killError:Error|undefined,stopping:Promise<void>|undefined,settled=false;
+    const finish=(error:Error|undefined,result?:string)=>{if(settled)return;settled=true;clearTimeout(timer);signal.removeEventListener('abort',abort);if(error)no(error);else ok(result!);};
+    const stop=(cause:'abort'|'timeout')=>{if(stopping||settled)return;reason=cause;stopping=new Promise<void>(resolve=>{
+     const pid=child.pid;if(!pid){resolve();return;}
+     if(windows){execFile(join(systemRoot,'System32','taskkill.exe'),['/PID',String(pid),'/T','/F'],{windowsHide:true,timeout:5000},error=>{if(error)killError=Error('Owned terminal process tree could not be stopped');resolve();});}
+     else{try{process.kill(-pid,'SIGKILL');}catch(e:any){if(e.code!=='ESRCH')killError=Error('Owned terminal process group could not be stopped');}resolve();}
+    });};
+    const abort=()=>stop('abort');const timer=setTimeout(()=>stop('timeout'),timeout);
+    signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();
+    child.stdout.on('data',b=>output=(output+b).slice(-100000));child.stderr.on('data',b=>output=(output+b).slice(-100000));
+    child.on('error',error=>finish(error));
+    child.on('close',async code=>{await stopping;if(killError){finish(killError);return;}if(reason==='abort'){finish(new DOMException('Terminal command cancelled','AbortError'));return;}if(reason==='timeout'){finish(Error(`Terminal command timed out after ${timeout} ms`));return;}finish(undefined,`Exit ${code}\n${output}`);});
+   });
+  }
   if(!name.startsWith('browser_'))throw Error('Unknown tool');const context=await this.context(botId);const page=context.pages()[0]??await context.newPage();
   if(name==='browser_open'){const u=new URL(args.url);if(!['http:','https:'].includes(u.protocol))throw Error('Only HTTP(S) navigation allowed');await page.goto(u.href,{waitUntil:'domcontentloaded',timeout:30000});return page.url();}
   if(name==='browser_read')return await page.locator('body').innerText({timeout:15000}).then(t=>t.slice(0,50000))+'\n\nInteractive elements:\n'+JSON.stringify(await page.locator('a,button,input,textarea,select').evaluateAll(es=>es.slice(0,100).map(e=>({tag:e.tagName,text:e.textContent?.slice(0,100),id:e.id,placeholder:e.getAttribute('placeholder'),type:e.getAttribute('type')}))));

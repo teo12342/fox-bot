@@ -2,35 +2,60 @@
   "schemaVersion": 1,
   "version": "0.1.0",
   "channel": "development",
-  "publishedAt": null,
+  "publishedAt": "2026-10-04T08:36:33.420Z",
   "sourceUrl": "https://github.com/teo12342/fox-bot",
-  "artifacts": [],
+  "repositoryUrl": "https://github.com/teo12342/fox-bot",
+  "sourceCommit": "3377c635ce7c2616c55ec67d4cc8a7a884407c54",
+  "artifacts": [
+    {
+      "platform": "windows",
+      "arch": "x64",
+      "format": "exe",
+      "warning": "Unsigned development installer. Production acceptance is incomplete.",
+      "size": 381956405,
+      "sha256": "1e18164ca1bd16085618d333daf3acfca38ca22b239b4134346ee4d3b9096db1",
+      "url": "https://github.com/teo12342/fox-bot/releases/download/v0.1.0-dev.1/fox-bot-0.1.0-win-x64.exe"
+    },
+    {
+      "platform": "android",
+      "arch": "universal",
+      "format": "apk",
+      "warning": "Debug-signed development APK. Physical Android acceptance is unverified.",
+      "size": 53427349,
+      "sha256": "2e60e643936baa3813b9da569b730ba40fc125842ce2e396551152255283131d",
+      "url": "https://github.com/teo12342/fox-bot/releases/download/v0.1.0-dev.1/fox-bot-0.1.0-android-universal-debug.apk"
+    }
+  ],
   "gates": [
     {
       "id": "identity",
       "label": "Official ChatGPT identity registration",
-      "passed": false
+      "passed": false,
+      "evidence": null
     },
     {
       "id": "fidelity",
       "label": "Reference screenshots and visual fidelity",
-      "passed": false
+      "passed": false,
+      "evidence": null
     },
     {
       "id": "signing",
       "label": "Signed Windows and Android packages",
-      "passed": false
+      "passed": false,
+      "evidence": null
     },
     {
       "id": "platforms",
       "label": "Clean-install platform certification",
-      "passed": false
+      "passed": false,
+      "evidence": null
     },
     {
       "id": "remote",
       "label": "Cross-network Android acceptance",
-      "passed": false
+      "passed": false,
+      "evidence": null
     }
-  ],
-  "repositoryUrl": "https://github.com/teo12342/fox-bot"
+  ]
 }

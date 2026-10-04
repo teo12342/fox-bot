@@ -9,3 +9,7 @@ After publishing, copy the exact releases.json into apps/web/public/releases.jso
 Website deployment uses the built Next.js static export. Configure VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID for the new Fox Bot project; do not reuse an unrelated project ID. No credentials are committed.
 
 Artifacts use fox-bot-VERSION-win-ARCH.exe, fox-bot-VERSION-linux-ARCH.FORMAT, and fox-bot-VERSION-android-universal.apk. The manifest normalizes win to windows. Linux formats are AppImage, deb, rpm, flatpak, tar.gz.
+
+Development prerelease v0.1.0-dev.1 contains an unsigned Windows x64 installer and debug-signed Android APK. Its artifacts remain immutable and do not satisfy production signing, identity, fidelity, full platform certification, or cross-network Android acceptance gates.
+
+Initial matrix run 37188933741 passed Windows x64 packaging and smoke. Windows ARM64 tests exposed the missing Canvas 0.1.80 native binding; use Canvas 0.1.100 with its Windows ARM64 optional dependency. Both Linux jobs failed AppImage packaging because the scoped package name inferred an invalid executable name. Linux packaging explicitly sets executableName to fox-bot in the package configuration and workflow CLI. These repairs require a fresh matrix run; successful source verification alone does not establish installer compatibility.
